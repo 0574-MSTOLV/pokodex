@@ -1,0 +1,19 @@
+【Pikachu】
+
+【图鉴编号】0025
+【属性】Electric
+【身高】0.4 m
+【体重】6.0 kg
+【特性】Static, Lightning-rod
+
+【种族值】
+  - HP: 35
+  - Attack: 55
+  - Defense: 40
+  - Sp. Atk: 50
+  - Sp. Def: 50
+  - Speed: 90
+  总计: 320
+
+【来源】用户查询: 皮卡丘
+【更新时间】2026-07-24 15:11:42
