@@ -4,15 +4,10 @@ import asyncio
 from dotenv import load_dotenv
 from utils.parser import parse_pokemon_data
 from utils.api import get_pokemon_data
-from utils.rag import ask_rag
-from utils.knowledge_writer import auto_add_to_knowledge_base
 
 load_dotenv()
 
 
-# ============================================================
-# 1. AI 识别宝可梦名称
-# ============================================================
 async def ai_understand(user_input):
     """调用大模型 API，理解用户想找什么宝可梦"""
     api_key = os.getenv("DEEPSEEK_API_KEY")
@@ -50,9 +45,6 @@ async def ai_understand(user_input):
         return None
 
 
-# ============================================================
-# 2. AI 生成宝可梦介绍
-# ============================================================
 async def ai_describe(pokemon_data, user_input):
     """根据宝可梦数据生成个性化介绍"""
     api_key = os.getenv("DEEPSEEK_API_KEY")
@@ -109,26 +101,13 @@ async def ai_describe(pokemon_data, user_input):
         return None
 
 
-# ============================================================
-# 3. RAG 知识库问答（含自动填充 + 调试日志）
-# ============================================================
 async def ai_ask_with_rag(user_input):
     """
-    使用 RAG 知识库回答用户问题
-    如果知识库没有，调用 API 并自动填充到知识库
+    直接调用 API，完全不走 RAG（临时禁用）
     """
     print(f"🔍 用户输入: {user_input}")
     
-    # 1️⃣ 先尝试 RAG 知识库
-    rag_answer, sources = ask_rag(user_input)
-    print(f"📚 RAG 结果: {rag_answer is not None}, 来源数: {len(sources) if sources else 0}")
-    
-    if rag_answer and sources:
-        print("✅ RAG 找到结果，直接返回")
-        return rag_answer.replace("~~", "")
-    
-    # 2️⃣ RAG 没找到，调用 API
-    print("🔄 RAG 无结果，调用 API...")
+    # 直接识别宝可梦
     pokemon_name = await ai_understand(user_input)
     print(f"🎯 AI 识别结果: {pokemon_name}")
     
@@ -136,20 +115,12 @@ async def ai_ask_with_rag(user_input):
         data = get_pokemon_data(pokemon_name)
         print(f"📦 API 数据: {data is not None}")
         if data:
-            print("💾 准备写入知识库...")
-            result = auto_add_to_knowledge_base(data, user_input)
-            print(f"💾 写入结果: {result}")
-            
             description = await ai_describe(data, user_input)
             return description.replace("~~", "") if description else f"这是 **{pokemon_name}**！"
     
-    # 3️⃣ 都没有找到
     return "我没有找到相关信息，你可以试试搜索神奇宝贝百科 😊"
 
 
-# ============================================================
-# 4. 运行异步函数的辅助工具
-# ============================================================
 def run_async(coro):
     """在同步环境中运行异步函数"""
     try:
