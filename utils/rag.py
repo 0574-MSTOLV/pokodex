@@ -1,5 +1,5 @@
 import os
-os.environ['HF_ENDPOINT'] = 'https://hf-mirror.com'  # 🔽 添加这一行
+os.environ['HF_ENDPOINT'] = 'https://hf-mirror.com'
 
 import streamlit as st
 import requests
@@ -13,7 +13,7 @@ VECTOR_DB_PATH = "./chroma_db"
 @st.cache_resource
 def get_embeddings_model():
     """获取嵌入模型"""
-    return SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')
+    return SentenceTransformer('all-MiniLM-L6-v2')
 
 
 @st.cache_resource
@@ -55,7 +55,7 @@ def build_knowledge_base():
     collection = client.create_collection(
         name="pokemon_knowledge",
         embedding_function=embedding_functions.SentenceTransformerEmbeddingFunction(
-            model_name="paraphrase-multilingual-MiniLM-L12-v2"
+            model_name="all-MiniLM-L6-v2"
         )
     )
     
