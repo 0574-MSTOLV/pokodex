@@ -1,7 +1,7 @@
 import streamlit as st
 from utils.api import get_pokemon_data
 from utils.parser import parse_pokemon_data
-from utils.ai import ai_understand, ai_describe, ai_ask_with_rag, run_async
+from utils.ai import ai_understand, ai_describe, run_async
 from components.sidebar import render_sidebar
 from components.pokemon_card import render_pokemon_card
 
@@ -12,19 +12,19 @@ st.set_page_config(
 )
 
 st.title("🎯 宝可梦AI助手")
-st.markdown("提问关于宝可梦的问题，AI 会结合知识库回答")
+st.markdown("输入宝可梦名称或描述特征，AI 帮你识别并展示信息")
 
 render_sidebar()
 
 # ========== 初始化状态 ==========
 if "messages" not in st.session_state:
     st.session_state.messages = []
-if "current_pokemon" not in st.session_state:
-    st.session_state.current_pokemon = None
+if "pokemon_parsed" not in st.session_state:
+    st.session_state.pokemon_parsed = None
 
 # ========== 渲染历史消息 ==========
 def render_messages():
-    for i, msg in enumerate(st.session_state.messages):
+    for msg in st.session_state.messages:
         with st.chat_message(msg["role"]):
             st.write(msg["content"])
             if msg["role"] == "assistant" and msg.get("pokemon_data"):
@@ -33,60 +33,72 @@ def render_messages():
 
 render_messages()
 
+# ========== 显示当前宝可梦卡片 ==========
+if st.session_state.pokemon_parsed:
+    render_pokemon_card(st.session_state.pokemon_parsed)
+    if st.button("🔄 重新查询", use_container_width=True):
+        st.session_state.pokemon_parsed = None
+        st.session_state.messages = []
+        st.rerun()
+
 # ========== 输入框 ==========
-prompt = st.chat_input("问关于宝可梦的问题...")
+prompt = st.chat_input("输入宝可梦名称或描述特征...")
 
 if prompt:
     # 添加用户消息
     st.session_state.messages.append({"role": "user", "content": prompt})
     
-    # 先尝试直接查宝可梦
-    data = get_pokemon_data(prompt)
-    
-    if data:
-        # 如果直接匹配到宝可梦名，走基础流程
-        pokemon = parse_pokemon_data(data)
-        response = f"找到宝可梦：**{pokemon['name']}**！"
+    with st.chat_message("assistant"):
+        # 先尝试直接查宝可梦
+        data = get_pokemon_data(prompt)
         
-        st.session_state.messages.append({
-            "role": "assistant",
-            "content": response,
-            "pokemon_data": pokemon
-        })
-        st.rerun()
-    else:
-        # 先用 AI 识别是哪只宝可梦
-        with st.spinner("🤔 正在识别..."):
-            pokemon_name = run_async(ai_understand(prompt))
-            
-            if pokemon_name and pokemon_name != "unknown":
-                data = get_pokemon_data(pokemon_name)
-                if data:
-                    pokemon = parse_pokemon_data(data)
-                    
-                    # 使用知识库问答
-                    with st.spinner("📚 检索知识库..."):
-                        # 改成使用 RAG
-                        answer = run_async(ai_ask_with_rag(prompt))
-                        clean_answer = answer.replace("~~", "") if answer else f"这是 **{pokemon_name}**！"
-                    
-                    st.session_state.messages.append({
-                        "role": "assistant",
-                        "content": clean_answer,
-                        "pokemon_data": pokemon
-                    })
-                    st.rerun()
+        if data:
+            # 直接匹配成功
+            pokemon = parse_pokemon_data(data)
+            st.session_state.pokemon_parsed = pokemon
+            response = f"找到宝可梦：**{pokemon['name']}**！"
+            st.write(response)
+            st.session_state.messages.append({
+                "role": "assistant",
+                "content": response,
+                "pokemon_data": pokemon
+            })
+            st.rerun()
+        else:
+            # 用 AI 识别
+            with st.spinner("🤔 正在识别..."):
+                pokemon_name = run_async(ai_understand(prompt))
+                
+                if pokemon_name and pokemon_name != "unknown":
+                    data = get_pokemon_data(pokemon_name)
+                    if data:
+                        pokemon = parse_pokemon_data(data)
+                        st.session_state.pokemon_parsed = pokemon
+                        
+                        # 生成 AI 介绍（不使用 RAG）
+                        description = run_async(ai_describe(data, prompt))
+                        clean_answer = description.replace("~~", "") if description else f"这是 **{pokemon_name}**！"
+                        
+                        st.write(clean_answer)
+                        st.session_state.messages.append({
+                            "role": "assistant",
+                            "content": clean_answer,
+                            "pokemon_data": pokemon
+                        })
+                        st.rerun()
+                    else:
+                        error_msg = f"找到 '{pokemon_name}'，但查不到数据 😅"
+                        st.error(error_msg)
+                        st.session_state.messages.append({
+                            "role": "assistant",
+                            "content": error_msg
+                        })
+                        st.rerun()
                 else:
-                    error_msg = f"找到 '{pokemon_name}'，但查不到数据 😅"
+                    error_msg = "没找到对应的宝可梦，换个描述试试？ 😊"
+                    st.warning(error_msg)
                     st.session_state.messages.append({
                         "role": "assistant",
                         "content": error_msg
                     })
                     st.rerun()
-            else:
-                error_msg = "没找到对应的宝可梦，换个描述试试？ 😊"
-                st.session_state.messages.append({
-                    "role": "assistant",
-                    "content": error_msg
-                })
-                st.rerun()
